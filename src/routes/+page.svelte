@@ -41,6 +41,8 @@ set b 0`;
 
     let editor = $state<HTMLDivElement>();
 
+    let shouldStop = $state(false);
+
     function handleStep() {
         if (!isRunning && parsedCode) {
             codeState.data = new State(parsedCode);
@@ -97,6 +99,8 @@ set b 0`;
         const state = codeState.data!;
 
         while (i < opsLimit && state.ip >= 0 && state.ip < state.code.length) {
+            if (shouldStop) return;
+
             const { idx } = state.stepOne();
             lastUopIdx = idx;
 
@@ -167,6 +171,12 @@ set b 0`;
     <div class="buttons">
         <button onclick={handleRun} id="run-btn" type="button" class="counter"
             >Run code</button
+        >
+        <button
+            onclick={() => (shouldStop = true)}
+            id="ustep-btn"
+            type="button"
+            class="counter">⏹️</button
         >
         <button
             onclick={handleReset}
