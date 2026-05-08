@@ -108,7 +108,7 @@ set b 0`;
             codeState.invalidate();
 
             if (stepTime > 0) {
-                await new Promise((res) => setTimeout(res));
+                await new Promise((res) => setTimeout(res, stepTime));
             }
         }
     }
