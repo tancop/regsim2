@@ -1,0 +1,311 @@
+<script lang="ts">
+    import { State } from "$lib/core";
+    import type { OpSeq } from "$lib/ops";
+    import { parseCode, ParseError } from "$lib/parse";
+    import { ExternalState } from "$lib/external.svelte";
+
+    const DEFAULT_ASM = `set a 32
+inc b
+divl a 2
+jo 6
+cmpl a 1
+jne 1
+mov b a
+set b 0`;
+
+    let isRunning = $state(false);
+    let asm = $state(DEFAULT_ASM);
+    let codeOutput = $state("...");
+
+    let { code: parsedCode, err: parseError } = $derived.by(() => {
+        try {
+            return { code: parseCode(asm) };
+        } catch (e) {
+            return { err: e as ParseError };
+        }
+    });
+
+    let codeState = $state(new ExternalState<State | undefined>(undefined));
+
+    let lastUopIdx = $state(0);
+
+    let currentIp = $state(-1);
+    let lastIp = $state(0);
+
+    let stepTime = $state(10);
+    let opsLimit = $state(1000);
+
+    let ops = $derived(asm.split("\n").map((s) => s.replace("\n", "")));
+
+    let editor = $state<HTMLDivElement>();
+
+    function handleStep() {
+        isRunning = true;
+
+        if (!codeState.data && parsedCode) {
+            codeState.data = new State(parsedCode);
+            lastIp = 0;
+        }
+
+        codeState.data!.stepAll();
+        lastUopIdx = 0;
+
+        lastIp = currentIp;
+        currentIp = codeState.data!.ip;
+
+        codeOutput = codeState.data!.show();
+
+        codeState.invalidate();
+    }
+
+    function handleUstep() {
+        isRunning = true;
+
+        if (!codeState.data && parsedCode) {
+            codeState.data = new State(parsedCode);
+            lastIp = 0;
+        }
+
+        const { idx } = codeState.data!.stepOne();
+        lastUopIdx = idx;
+
+        lastIp = currentIp;
+        currentIp = codeState.data!.ip;
+
+        codeOutput = codeState.data!.show();
+
+        codeState.invalidate();
+    }
+
+    function handleReset(e: Element | Event) {
+        isRunning = false;
+        codeOutput = "...";
+        lastIp = -1;
+        currentIp = 0;
+        lastUopIdx = 0;
+    }
+
+    $effect(() => {
+        if (editor && !isRunning) {
+            editor.spellcheck = false;
+            editor.focus();
+        }
+    });
+</script>
+
+<main id="center" use:handleReset>
+    <h1>RegSim v2</h1>
+    <div class="code-container">
+        {#if isRunning}
+            <div class="code code-editor">
+                {#each ops as op, idx}
+                    <p class={idx == lastIp ? "current-op" : ""}>
+                        {op}
+                    </p>
+                {/each}
+            </div>
+        {:else}
+            <div
+                bind:this={editor}
+                bind:innerText={asm}
+                class="code code-editor"
+                contenteditable
+            ></div>
+        {/if}
+        <div class="code ops-view">
+            {#if parsedCode}
+                {#each parsedCode[lastIp] as uop, idx}
+                    <p
+                        class={isRunning && idx == lastUopIdx
+                            ? "current-op"
+                            : ""}
+                    >
+                        {uop}
+                    </p>
+                {/each}
+            {:else}
+                <p class="error">Parse error: {parseError!.message}</p>
+            {/if}
+        </div>
+    </div>
+    <div class="buttons">
+        <button onclick={handleRun} id="run-btn" type="button" class="counter"
+            >Run code</button
+        >
+        <button
+            onclick={handleReset}
+            id="reset-btn"
+            type="button"
+            class="counter">🔁</button
+        >
+        <button
+            onclick={handleUstep}
+            id="ustep-btn"
+            type="button"
+            class="counter">▶️</button
+        >
+        <button onclick={handleStep} id="step-btn" type="button" class="counter"
+            >⏩</button
+        >
+    </div>
+    <div class="buttons">
+        <label class="label" for="step-time">Step time (ms):</label>
+        <input
+            bind:value={stepTime}
+            class="number-input"
+            id="step-time"
+            type="number"
+        />
+        <label class="label" for="ops-limit">Max operations:</label>
+        <input
+            bind:value={opsLimit}
+            class="number-input"
+            id="ops-limit"
+            type="number"
+        />
+    </div>
+    <pre class="code output">{codeOutput}</pre>
+</main>
+
+<style>
+    h1 {
+        font-family: var(--heading);
+        font-weight: 500;
+        color: var(--text-h);
+    }
+
+    h1 {
+        font-size: 56px;
+        letter-spacing: -1.68px;
+        margin: 32px 0;
+        @media (max-width: 1024px) {
+            font-size: 36px;
+            margin: 20px 0;
+        }
+    }
+
+    p {
+        margin: 0;
+    }
+    .counter {
+        font-family: var(--mono);
+        display: inline-flex;
+        border-radius: 4px;
+        color: var(--text-h);
+    }
+
+    .code-container {
+        width: 67%;
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+
+        margin-top: 2rem;
+
+        & > * {
+            margin: 0;
+        }
+    }
+
+    .code-editor,
+    .ops-view {
+        width: 100%;
+        font-family: var(--mono);
+        font-size: 15px;
+        line-height: 135%;
+        padding: 4px 8px;
+        background: var(--code-bg);
+        text-align: start;
+
+        resize: none;
+
+        & > p {
+            margin: 0;
+        }
+    }
+
+    .current-op {
+        color: var(--code-bg);
+        background: var(--text);
+    }
+
+    .output {
+        width: 67%;
+        font-family: var(--mono);
+        font-size: 15px;
+        line-height: 135%;
+        padding: 4px 8px;
+        background: var(--code-bg);
+        text-align: start;
+    }
+
+    .counter {
+        font-size: 16px;
+        padding: 5px 10px;
+        border-radius: 5px;
+        color: var(--accent);
+        background: var(--accent-bg);
+        border: 2px solid transparent;
+        transition: border-color 0.3s;
+        margin-bottom: 24px;
+
+        &:hover {
+            border-color: var(--accent-border);
+        }
+        &:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+    }
+
+    .buttons {
+        display: flex;
+        gap: 0.5rem;
+
+        & > * {
+            margin: 0;
+        }
+    }
+
+    #center {
+        display: flex;
+        flex-direction: column;
+        gap: 25px;
+        place-content: center;
+        place-items: center;
+        flex-grow: 1;
+
+        @media (max-width: 1024px) {
+            padding: 32px 20px 24px;
+            gap: 18px;
+        }
+    }
+
+    .label {
+        font-family: var(--mono);
+        font-size: 14px;
+        color: var(--text);
+        background-color: var(--accent-bg);
+        font-weight: bold;
+
+        align-self: center;
+        padding: 5px 10px;
+        border-radius: 5px;
+
+        margin: 0;
+    }
+
+    .number-input {
+        font-family: var(--mono);
+        font-size: 14px;
+        color: var(--text);
+
+        width: 3rem;
+        margin: 0;
+    }
+
+    .error {
+        color: var(--error);
+        font-weight: bold;
+    }
+</style>
