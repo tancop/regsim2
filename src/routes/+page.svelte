@@ -1,6 +1,5 @@
 <script lang="ts">
     import { State } from "$lib/core";
-    import type { OpSeq } from "$lib/ops";
     import { parseCode, ParseError } from "$lib/parse";
     import { ExternalState } from "$lib/external.svelte";
 
@@ -133,6 +132,11 @@ set b 0`;
     });
 </script>
 
+<svelte:head>
+    <title>RegSim</title>
+    <meta name="description" content="FIIT STU Register Simulator" />
+</svelte:head>
+
 <main id="center" use:handleReset>
     <h1>RegSim v2</h1>
     <div class="code-container">
@@ -169,30 +173,19 @@ set b 0`;
         </div>
     </div>
     <div class="buttons">
-        <button onclick={handleRun} id="run-btn" type="button" class="counter"
+        <button onclick={handleRun} type="button" class="button"
             >Run code</button
         >
         <button
             onclick={() => (shouldStop = true)}
-            id="ustep-btn"
             type="button"
-            class="counter">⏹️</button
+            class="button"
         >
-        <button
-            onclick={handleReset}
-            id="reset-btn"
-            type="button"
-            class="counter">🔁</button
+            ⏹️</button
         >
-        <button
-            onclick={handleUstep}
-            id="ustep-btn"
-            type="button"
-            class="counter">▶️</button
-        >
-        <button onclick={handleStep} id="step-btn" type="button" class="counter"
-            >⏩</button
-        >
+        <button onclick={handleReset} type="button" class="button">🔁</button>
+        <button onclick={handleUstep} type="button" class="button">▶️</button>
+        <button onclick={handleStep} type="button" class="button">⏩</button>
     </div>
     <div class="buttons">
         <label class="label" for="step-time">Step time (ms):</label>
@@ -232,12 +225,6 @@ set b 0`;
 
     p {
         margin: 0;
-    }
-    .counter {
-        font-family: var(--mono);
-        display: inline-flex;
-        border-radius: 4px;
-        color: var(--text-h);
     }
 
     .code-container {
@@ -285,27 +272,9 @@ set b 0`;
         text-align: start;
     }
 
-    .counter {
-        font-size: 16px;
-        padding: 5px 10px;
-        border-radius: 5px;
-        color: var(--accent);
-        background: var(--accent-bg);
-        border: 2px solid transparent;
-        transition: border-color 0.3s;
-        margin-bottom: 24px;
-
-        &:hover {
-            border-color: var(--accent-border);
-        }
-        &:focus-visible {
-            outline: 2px solid var(--accent);
-            outline-offset: 2px;
-        }
-    }
-
     .buttons {
         display: flex;
+        align-items: center;
         gap: 0.5rem;
 
         & > * {
@@ -327,18 +296,33 @@ set b 0`;
         }
     }
 
-    .label {
+    .label,
+    .button {
+        height: 2rem;
+
         font-family: var(--mono);
-        font-size: 14px;
+        font-size: 16px;
         color: var(--text);
         background-color: var(--accent-bg);
         font-weight: bold;
 
         align-self: center;
+        align-content: center;
+
         padding: 5px 10px;
         border-radius: 5px;
 
+        border: none;
+
         margin: 0;
+
+        &:hover {
+            border-color: var(--accent-border);
+        }
+        &:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
     }
 
     .number-input {
@@ -346,7 +330,8 @@ set b 0`;
         font-size: 14px;
         color: var(--text);
 
-        width: 3rem;
+        width: 4rem;
+        height: 2rem;
         margin: 0;
     }
 
