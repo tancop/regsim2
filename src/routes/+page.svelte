@@ -28,10 +28,8 @@ set b 0`;
 
     let lastUopIdx = $state(0);
 
-    let currentIp = $state(-1);
+    let currentIp = $state(0);
     let lastIp = $state(0);
-
-    let displayedIp = $derived(isRunning ? lastIp : 0);
 
     let stepTime = $state(10);
     let opsLimit = $state(1000);
@@ -39,12 +37,40 @@ set b 0`;
     let ops = $derived(asm.split("\n").map((s) => s.replace("\n", "")));
 
     let editor = $state<HTMLDivElement>();
+    let opsView = $state<HTMLDivElement>();
 
     let shouldStop = $state(false);
+
+    function makeUopsMap(state: State): HTMLParagraphElement[] {
+        let result = [];
+
+        let i = 0;
+        for (const ins of state.code) {
+            for (const uop of ins.ops) {
+                const p = document.createElement("p");
+                if (typeof uop === "string") {
+                    p.textContent = uop;
+                } else {
+                    p.textContent = uop.join(" ");
+                }
+                p.classList.add("op");
+                p.classList.add(`ops-group-${i}`);
+                if (i != currentIp) {
+                    p.hidden = true;
+                }
+                result.push(p);
+            }
+            i++;
+        }
+
+        return result;
+    }
 
     function handleStep() {
         if (!isRunning && parsedCode) {
             codeState.data = new State(parsedCode);
+            if (opsView)
+                opsView.replaceChildren(...makeUopsMap(codeState.data));
             lastIp = 0;
         }
 
@@ -66,6 +92,8 @@ set b 0`;
     function handleUstep() {
         if (!isRunning && parsedCode) {
             codeState.data = new State(parsedCode);
+            if (opsView)
+                opsView.replaceChildren(...makeUopsMap(codeState.data));
             lastIp = 0;
         }
 
@@ -84,13 +112,15 @@ set b 0`;
         codeState.invalidate();
     }
 
-    async function handleRun(e: MouseEvent) {
-        handleReset(e);
+    async function handleRun() {
+        handleReset();
 
         isRunning = true;
 
         if (parsedCode) {
             codeState.data = new State(parsedCode);
+            if (opsView)
+                opsView.replaceChildren(...makeUopsMap(codeState.data));
         }
 
         let i = 0;
@@ -117,12 +147,16 @@ set b 0`;
         }
     }
 
-    function handleReset(e: Element | Event) {
+    function handleReset() {
         isRunning = false;
         codeOutput = "...";
-        lastIp = -1;
+        lastIp = 0;
         currentIp = 0;
         lastUopIdx = 0;
+
+        for (const e of getPsOfClass("op")) {
+            e.classList.remove("current-op");
+        }
     }
 
     $effect(() => {
@@ -131,6 +165,60 @@ set b 0`;
             editor.focus();
         }
     });
+
+    function getPsOfClass(
+        className: string,
+    ): HTMLCollectionOf<HTMLParagraphElement> {
+        return document.getElementsByClassName(
+            className,
+        ) as HTMLCollectionOf<HTMLParagraphElement>;
+    }
+
+    $effect(() => {
+        if (isRunning) {
+            for (const e of getPsOfClass("op")) {
+                e.hidden = true;
+            }
+
+            for (const e of getPsOfClass(`ops-group-${lastIp}`)) {
+                e.hidden = false;
+            }
+        }
+    });
+
+    $effect(() => {
+        if (isRunning) {
+            const arr = getPsOfClass(`ops-group-${lastIp}`);
+            for (const e of arr) {
+                e.classList.remove("current-op");
+            }
+            arr.item(lastUopIdx)?.classList.add("current-op");
+        }
+    });
+
+    $effect(() => {
+        if (parseError) {
+            const p = document.createElement("p");
+            p.textContent = `Parse error: ${parseError.message}`;
+            p.classList.add("error");
+            opsView?.replaceChildren(p);
+        }
+    });
+
+    function loadCode() {
+        if (parsedCode) {
+            codeState.data = new State(parsedCode);
+        }
+        if (opsView && codeState.data) {
+            opsView.replaceChildren(...makeUopsMap(codeState.data));
+            currentIp = 0;
+        }
+    }
+
+    function start(e: Element) {
+        handleReset();
+        loadCode();
+    }
 </script>
 
 <svelte:head>
@@ -138,7 +226,7 @@ set b 0`;
     <meta name="description" content="FIIT STU Register Simulator" />
 </svelte:head>
 
-<main id="center" use:handleReset>
+<main id="center" use:start>
     <h1>RegSim v2</h1>
     <div class="code-container">
         {#if isRunning}
@@ -153,25 +241,12 @@ set b 0`;
             <div
                 bind:this={editor}
                 bind:innerText={asm}
+                oninput={loadCode}
                 class="code code-editor"
                 contenteditable
             ></div>
         {/if}
-        <div class="code ops-view">
-            {#if parsedCode}
-                {#each parsedCode[displayedIp] as uop, idx}
-                    <p
-                        class={isRunning && idx == lastUopIdx
-                            ? "current-op"
-                            : ""}
-                    >
-                        {uop}
-                    </p>
-                {/each}
-            {:else}
-                <p class="error">Parse error: {parseError!.message}</p>
-            {/if}
-        </div>
+        <div bind:this={opsView} class="code ops-view"></div>
     </div>
     <div class="buttons">
         <button onclick={handleRun} type="button" class="button"
@@ -258,7 +333,11 @@ set b 0`;
         }
     }
 
-    .current-op {
+    :global(.op) {
+        margin: 0;
+    }
+
+    :global(.current-op) {
         color: var(--code-bg);
         background: var(--text);
     }
@@ -336,7 +415,7 @@ set b 0`;
         margin: 0;
     }
 
-    .error {
+    :global(.error) {
         color: var(--error);
         font-weight: bold;
     }
