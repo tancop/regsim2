@@ -42,17 +42,17 @@ set b 0`;
     let editor = $state<HTMLDivElement>();
 
     function handleStep() {
-        isRunning = true;
-
-        if (!codeState.data && parsedCode) {
+        if (!isRunning && parsedCode) {
             codeState.data = new State(parsedCode);
             lastIp = 0;
         }
 
+        isRunning = true;
+
         const state = codeState.data!;
 
         state.stepAll();
-        lastUopIdx = 0;
+        lastUopIdx = state.code[currentIp].ops.length - 1;
 
         lastIp = currentIp;
         currentIp = state.ip;
@@ -63,12 +63,12 @@ set b 0`;
     }
 
     function handleUstep() {
-        isRunning = true;
-
-        if (!codeState.data && parsedCode) {
+        if (!isRunning && parsedCode) {
             codeState.data = new State(parsedCode);
             lastIp = 0;
         }
+
+        isRunning = true;
 
         const state = codeState.data!;
 
