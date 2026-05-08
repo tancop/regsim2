@@ -113,6 +113,7 @@ set b 0`;
             if (stepTime > 0) {
                 await new Promise((res) => setTimeout(res, stepTime));
             }
+            i++;
         }
     }
 
