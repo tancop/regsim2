@@ -32,6 +32,8 @@ set b 0`;
     let currentIp = $state(-1);
     let lastIp = $state(0);
 
+    let displayedIp = $derived(isRunning ? lastIp : 0);
+
     let stepTime = $state(10);
     let opsLimit = $state(1000);
 
@@ -47,13 +49,15 @@ set b 0`;
             lastIp = 0;
         }
 
-        codeState.data!.stepAll();
+        const state = codeState.data!;
+
+        state.stepAll();
         lastUopIdx = 0;
 
         lastIp = currentIp;
-        currentIp = codeState.data!.ip;
+        currentIp = state.ip;
 
-        codeOutput = codeState.data!.show();
+        codeOutput = state.show();
 
         codeState.invalidate();
     }
@@ -66,15 +70,47 @@ set b 0`;
             lastIp = 0;
         }
 
-        const { idx } = codeState.data!.stepOne();
+        const state = codeState.data!;
+
+        const { idx } = state.stepOne();
         lastUopIdx = idx;
 
         lastIp = currentIp;
-        currentIp = codeState.data!.ip;
+        currentIp = state.ip;
 
-        codeOutput = codeState.data!.show();
+        codeOutput = state.show();
 
         codeState.invalidate();
+    }
+
+    async function handleRun(e: MouseEvent) {
+        handleReset(e);
+
+        isRunning = true;
+
+        if (parsedCode) {
+            codeState.data = new State(parsedCode);
+        }
+
+        let i = 0;
+
+        const state = codeState.data!;
+
+        while (i < opsLimit && state.ip >= 0 && state.ip < state.code.length) {
+            const { idx } = state.stepOne();
+            lastUopIdx = idx;
+
+            lastIp = currentIp;
+            currentIp = state.ip;
+
+            codeOutput = state.show();
+
+            codeState.invalidate();
+
+            if (stepTime > 0) {
+                await new Promise((res) => setTimeout(res));
+            }
+        }
     }
 
     function handleReset(e: Element | Event) {
@@ -114,7 +150,7 @@ set b 0`;
         {/if}
         <div class="code ops-view">
             {#if parsedCode}
-                {#each parsedCode[lastIp] as uop, idx}
+                {#each parsedCode[displayedIp] as uop, idx}
                     <p
                         class={isRunning && idx == lastUopIdx
                             ? "current-op"
