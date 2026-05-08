@@ -206,6 +206,9 @@ set b 0`;
     });
 
     function loadCode() {
+        // remove extra whitespace and save
+        localStorage.setItem("code", asm.replaceAll(/\n+/g, "\n"));
+
         if (parsedCode) {
             codeState.data = new State(parsedCode);
         }
@@ -216,6 +219,9 @@ set b 0`;
     }
 
     function start(e: Element) {
+        if (localStorage.getItem("code")) {
+            asm = localStorage.getItem("code")!;
+        }
         handleReset();
         loadCode();
     }
