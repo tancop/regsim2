@@ -28,6 +28,13 @@ set b 0`;
 
     let lastUopIdx = $state(0);
 
+    // length of longest instruction in ucode
+    let maxUcodeLength = $derived(
+        codeState.data?.code.reduce((acc, insn) =>
+            insn.ops.length > acc.ops.length ? insn : acc,
+        )?.ops.length ?? 0,
+    );
+
     let currentIp = $state(0);
     let lastIp = $state(0);
 
@@ -41,36 +48,9 @@ set b 0`;
 
     let shouldStop = $state(false);
 
-    function makeUopsMap(state: State): HTMLParagraphElement[] {
-        let result = [];
-
-        let i = 0;
-        for (const ins of state.code) {
-            for (const uop of ins.ops) {
-                const p = document.createElement("p");
-                if (typeof uop === "string") {
-                    p.textContent = uop;
-                } else {
-                    p.textContent = uop.join(" ");
-                }
-                p.classList.add("op");
-                p.classList.add(`ops-group-${i}`);
-                if (i != currentIp) {
-                    p.hidden = true;
-                }
-                result.push(p);
-            }
-            i++;
-        }
-
-        return result;
-    }
-
     function handleStep() {
         if (!isRunning && parsedCode) {
             codeState.data = new State(parsedCode);
-            if (opsView)
-                opsView.replaceChildren(...makeUopsMap(codeState.data));
             lastIp = 0;
         }
 
@@ -92,8 +72,6 @@ set b 0`;
     function handleUstep() {
         if (!isRunning && parsedCode) {
             codeState.data = new State(parsedCode);
-            if (opsView)
-                opsView.replaceChildren(...makeUopsMap(codeState.data));
             lastIp = 0;
         }
 
@@ -119,8 +97,6 @@ set b 0`;
 
         if (parsedCode) {
             codeState.data = new State(parsedCode);
-            if (opsView)
-                opsView.replaceChildren(...makeUopsMap(codeState.data));
         }
 
         let i = 0;
@@ -153,55 +129,12 @@ set b 0`;
         lastIp = 0;
         currentIp = 0;
         lastUopIdx = 0;
-
-        for (const e of getPsOfClass("op")) {
-            e.classList.remove("current-op");
-        }
     }
 
     $effect(() => {
         if (editor && !isRunning) {
             editor.spellcheck = false;
             editor.focus();
-        }
-    });
-
-    function getPsOfClass(
-        className: string,
-    ): HTMLCollectionOf<HTMLParagraphElement> {
-        return document.getElementsByClassName(
-            className,
-        ) as HTMLCollectionOf<HTMLParagraphElement>;
-    }
-
-    $effect(() => {
-        if (isRunning) {
-            for (const e of getPsOfClass("op")) {
-                e.hidden = true;
-            }
-
-            for (const e of getPsOfClass(`ops-group-${lastIp}`)) {
-                e.hidden = false;
-            }
-        }
-    });
-
-    $effect(() => {
-        if (isRunning) {
-            const arr = getPsOfClass(`ops-group-${lastIp}`);
-            for (const e of arr) {
-                e.classList.remove("current-op");
-            }
-            arr.item(lastUopIdx)?.classList.add("current-op");
-        }
-    });
-
-    $effect(() => {
-        if (parseError) {
-            const p = document.createElement("p");
-            p.textContent = `Parse error: ${parseError.message}`;
-            p.classList.add("error");
-            opsView?.replaceChildren(p);
         }
     });
 
@@ -213,7 +146,6 @@ set b 0`;
             codeState.data = new State(parsedCode);
         }
         if (opsView && codeState.data) {
-            opsView.replaceChildren(...makeUopsMap(codeState.data));
             currentIp = 0;
         }
     }
@@ -224,6 +156,33 @@ set b 0`;
         }
         handleReset();
         loadCode();
+    }
+
+    function* rangeIter(a: number, b: number): Iterable<number> {
+        const diff = b - a;
+
+        for (let i = 0; i < diff; i++) {
+            yield a + i;
+        }
+    }
+
+    function getUopString(idx: number): string {
+        if (!codeState.data) {
+            return "";
+        }
+
+        const ops = codeState.data.code[lastIp].ops;
+        if (idx >= ops.length) {
+            return "";
+        }
+
+        const op = ops[idx];
+
+        if (typeof op === "string") {
+            return op;
+        } else {
+            return op.join(" ");
+        }
     }
 </script>
 
@@ -252,7 +211,17 @@ set b 0`;
                 contenteditable
             ></div>
         {/if}
-        <div bind:this={opsView} class="code ops-view"></div>
+        <div bind:this={opsView} class="code ops-view">
+            {#if parseError}
+                <div class="error">Parse error: {parseError.message}</div>
+            {:else}
+                {#each rangeIter(0, maxUcodeLength) as idx (idx)}
+                    <div class={idx == lastUopIdx ? "current-op" : ""}>
+                        {getUopString(idx)}
+                    </div>
+                {/each}
+            {/if}
+        </div>
     </div>
     <div class="buttons">
         <button onclick={handleRun} type="button" class="button"
