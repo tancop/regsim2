@@ -94,6 +94,7 @@ set b 0`;
         handleReset();
 
         isRunning = true;
+        shouldStop = false;
 
         if (parsedCode) {
             codeState.data = new State(parsedCode);
